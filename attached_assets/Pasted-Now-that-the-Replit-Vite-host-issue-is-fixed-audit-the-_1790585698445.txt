@@ -1,0 +1,229 @@
+Now that the Replit Vite host issue is fixed, audit the **existing CivicPulse project** that was imported from GitHub.
+
+IMPORTANT:
+
+* Do NOT rebuild the application.
+* Do NOT replace the existing UI.
+* Do NOT create a new template.
+* Do NOT redesign working pages.
+* Do NOT add a real backend yet.
+* Preserve everything that is already working.
+
+Your job in this step is to **inspect, test, and understand the current implementation**.
+
+## 1. Inspect the project
+
+Check:
+
+* package.json
+* Vite configuration
+* routes
+* pages
+* components
+* hooks
+* state management
+* mock data
+* services
+* localStorage
+* authentication/demo login
+* forms
+* map implementation
+* charts
+* report workflow
+* dashboards
+* responsive design
+
+## 2. Run the application
+
+Test the actual application through the Replit preview.
+
+Check every major navigation item and button.
+
+Look for:
+
+* broken routes
+* blank pages
+* console errors
+* runtime errors
+* missing imports
+* buttons that do nothing
+* forms that don't submit
+* state that disappears after navigation
+* fake data that is not shared between pages
+* incomplete screens
+* mobile layout problems
+
+## 3. Compare against the CivicPulse prototype requirements
+
+Check whether these already exist:
+
+### Citizen
+
+* Landing page
+* Citizen login/demo login
+* Citizen dashboard
+* Report Issue
+* Image upload
+* Image preview
+* Description
+* Category
+* Location
+* Map
+* Address
+* Ward
+* Timestamp
+* AI analysis simulation
+* Editable AI results
+* Severity
+* Department recommendation
+* Duplicate detection
+* Review before submission
+* Complaint ID
+* My Reports
+* Issue Details
+* Status timeline
+* Notifications
+
+### Authority
+
+* Authority login
+* Authority dashboard
+* Statistics
+* Priority queue
+* Filters
+* Issue details
+* Assignment
+* Department selection
+* Officer selection
+* Status changes
+* Notes
+* Resolution evidence
+* Before/after images
+* SLA indicator
+
+### Citizen verification
+
+* Awaiting verification
+* YES, RESOLVED
+* NO, STILL EXISTS
+* Reopen issue
+
+### Civic intelligence
+
+* Civic map
+* Issue markers
+* Filters
+* Heatmap
+* Analytics
+* Recurring problems
+* Proactive insights
+
+### Admin
+
+* Users
+* Departments
+* Wards
+* Categories
+* SLA
+* AI settings
+* Notifications
+* Audit logs
+
+## 4. Check the most important data flow
+
+Test whether this works with the CURRENT implementation:
+
+Citizen
+→ Create report
+→ Submit report
+→ Complaint ID generated
+→ Report appears in My Reports
+→ Same report appears in Authority dashboard
+→ Authority opens report
+→ Authority changes status
+→ Authority assigns department/officer
+→ Authority submits resolution
+→ Citizen sees verification request
+→ Citizen verifies/reopens
+→ Final status updates everywhere
+
+If the application currently uses separate hardcoded data for different pages, identify this as a problem.
+
+## 5. Check the existing AI implementation
+
+Determine whether the current project already has:
+
+* mock AI
+* AI service abstraction
+* hardcoded AI responses
+* real API calls
+
+For this prototype, keep AI MOCKED.
+
+Do not add OpenAI or another real AI API yet.
+
+## 6. Check location
+
+Determine how the existing application currently handles location.
+
+It should support the prototype concept of:
+
+* latitude
+* longitude
+* address
+* city
+* ward
+* timestamp
+* map position
+
+Do not add unnecessary backend services.
+
+## 7. Check persistence
+
+Determine whether reports/status changes survive:
+
+* page navigation
+* route changes
+* dashboard switching
+* role switching
+* browser refresh where appropriate
+
+Use the existing state architecture if possible.
+
+If localStorage is already being used, preserve it.
+
+## 8. IMPORTANT — DO NOT MAKE LARGE CHANGES YET
+
+After inspection, give me a concise report in this format:
+
+### WORKING
+
+List features that are already functional.
+
+### PARTIALLY WORKING
+
+List features that exist but need completion/fixing.
+
+### MISSING
+
+List features that don't exist.
+
+### BROKEN
+
+List actual bugs/errors discovered.
+
+### FILES TO MODIFY
+
+List the specific files/components that will need changes.
+
+### RECOMMENDED ORDER
+
+Give me the best order to implement the missing functionality while minimizing changes to existing code.
+
+Do not start a major redesign.
+
+Do not rebuild existing functionality.
+
+Only fix obvious errors that prevent the application from running.
+
+After the audit, STOP and show me the report.

@@ -1,0 +1,398 @@
+You are taking over an existing project called **CivicPulse**, an AI-powered civic issue reporting and municipal infrastructure management platform.
+
+The project was originally created in Lovable and has been pushed to GitHub. You are now continuing development in Replit.
+
+**IMPORTANT: DO NOT REBUILD THE PROJECT FROM SCRATCH.**
+
+First, inspect the entire existing repository and understand what has already been implemented.
+
+## YOUR FIRST TASK
+
+Perform a complete technical and functional audit of the existing project.
+
+Inspect:
+
+* package.json
+* project structure
+* routes
+* pages
+* components
+* hooks
+* state management
+* mock data
+* services
+* authentication/demo login
+* forms
+* navigation
+* maps
+* charts
+* report submission
+* dashboards
+* responsive layouts
+* localStorage/state persistence
+* existing AI/mock AI implementation
+
+Do not modify anything until you understand the existing architecture.
+
+## EXISTING PROJECT
+
+The existing application is CivicPulse.
+
+Tagline:
+
+**“From Citizen Reports to Smarter Cities”**
+
+It is a civic issue reporting and infrastructure management platform.
+
+The existing Lovable version already contains part of the UI and functionality.
+
+Your job is to CONTINUE FROM THE CURRENT CODE.
+
+Preserve existing:
+
+* CivicPulse branding
+* visual design
+* working components
+* existing routes
+* existing functionality
+* existing mock data
+* existing layout
+
+Only change existing code when necessary to fix bugs or complete missing functionality.
+
+## FIRST PRIORITY: MAKE THE EXISTING APP STABLE
+
+Before adding major features:
+
+1. Run the project.
+2. Identify compilation errors.
+3. Identify runtime errors.
+4. Identify broken imports.
+5. Identify missing dependencies.
+6. Identify broken routes.
+7. Identify buttons that do nothing.
+8. Identify forms that do not submit.
+9. Identify pages that are incomplete.
+10. Identify state that does not persist between pages.
+
+Fix these issues first.
+
+Do not spend tokens redesigning the UI.
+
+## THEN CREATE A FEATURE AUDIT
+
+Compare the existing project against these required prototype capabilities:
+
+### CITIZEN
+
+* Landing page
+* Demo login
+* Citizen dashboard
+* Report issue
+* Image upload
+* Image preview
+* Description
+* Category
+* Location
+* Map
+* Latitude/longitude
+* Address
+* Ward
+* Timestamp
+* Simulated AI analysis
+* AI category
+* AI severity
+* AI department
+* AI summary
+* AI confidence
+* Editable AI results
+* Duplicate detection
+* Similar nearby reports
+* Review before submission
+* Complaint ID generation
+* My Reports
+* Issue details
+* Status timeline
+* Notifications
+
+### AUTHORITY
+
+* Authority dashboard
+* Issue list
+* Priority queue
+* Filters
+* Issue details
+* Citizen report information
+* Location
+* AI analysis
+* Duplicate reports
+* Assign department
+* Assign officer
+* Change priority
+* Change status
+* Add notes
+* Request information
+* Resolution evidence
+* Before image
+* After image
+* Resolution notes
+* SLA indicator
+
+Statuses:
+
+NEW
+UNDER REVIEW
+ASSIGNED
+IN PROGRESS
+RESOLUTION SUBMITTED
+AWAITING CITIZEN VERIFICATION
+RESOLVED
+REOPENED
+REJECTED
+
+### CITIZEN VERIFICATION
+
+After authority submits resolution:
+
+Citizen must see:
+
+**“Has this issue actually been resolved?”**
+
+Buttons:
+
+**YES, RESOLVED**
+
+**NO, STILL EXISTS**
+
+YES → RESOLVED
+
+NO → REOPENED
+
+This must update the same issue state used by the authority dashboard.
+
+### CIVIC MAP
+
+* Interactive map
+* Issue markers
+* Marker popup
+* Category filters
+* Severity filters
+* Status filters
+* Ward filters
+* Heatmap/demo heatmap
+* Active issue visualization
+
+### ANALYTICS
+
+* Total reports
+* Open reports
+* Resolved reports
+* Resolution rate
+* Average resolution time
+* Category distribution
+* Severity distribution
+* Ward distribution
+* Monthly trends
+* SLA performance
+
+### RECURRING ISSUES
+
+Show recurring civic problems based on mock data:
+
+* repeated potholes
+* garbage overflow
+* water leakage
+* drainage issues
+* streetlight failures
+
+### PROACTIVE INSIGHTS
+
+Show decision-support insights such as:
+
+“Multiple road damage reports have appeared in Ward 4.”
+
+“Garbage overflow reports increased this month.”
+
+“Streetlight complaints are recurring near this location.”
+
+These are demo insights, not real predictions.
+
+### ADMIN
+
+* Users
+* Departments
+* Wards
+* Categories
+* SLA settings
+* Priority settings
+* AI settings
+* Notifications
+* Audit logs
+* Analytics
+
+## IMPORTANT DATA REQUIREMENT
+
+The prototype must use a CENTRALIZED mock data/state system.
+
+Do NOT create separate fake data for each page.
+
+If a citizen submits:
+
+Pothole → High → Road Maintenance → Ward 4
+
+then the SAME issue must appear in:
+
+Citizen Dashboard
+→ My Reports
+→ Issue Details
+→ Authority Dashboard
+→ Authority Issue Details
+→ Resolution workflow
+→ Citizen Verification
+→ Analytics
+→ Map
+
+Use localStorage or the project's existing state-management approach.
+
+## FRONTEND ONLY
+
+For now:
+
+DO NOT add:
+
+* Supabase
+* real database
+* real AI API
+* OpenAI API
+* email service
+* SMS service
+* production authentication
+* payment system
+
+Use mock/local services.
+
+Create or preserve abstractions such as:
+
+mockAuthService
+mockIssueService
+mockAIService
+mockLocationService
+mockNotificationService
+mockAnalyticsService
+
+The architecture should make it possible to replace mocks with real backend services later.
+
+## AI SIMULATION
+
+The report workflow should simulate:
+
+Image + Description
+↓
+AI Analysis
+↓
+Category
+↓
+Severity
+↓
+Department
+↓
+Impact
+↓
+Confidence
+↓
+Possible duplicates
+
+The AI result must be editable.
+
+## DEMO ACCOUNTS
+
+Keep/create:
+
+Citizen:
+[citizen.demo@example.com](mailto:citizen.demo@example.com)
+
+Authority:
+[authority.demo@example.com](mailto:authority.demo@example.com)
+
+Admin:
+[admin.demo@example.com](mailto:admin.demo@example.com)
+
+Demo authentication is sufficient.
+
+## MOST IMPORTANT END-TO-END TEST
+
+After auditing and fixing the project, make sure this exact workflow works:
+
+Landing
+→ Citizen Login
+→ Citizen Dashboard
+→ Report Issue
+→ Upload Image
+→ Description
+→ Location
+→ AI Analysis
+→ Edit AI Result
+→ Duplicate Detection
+→ Review
+→ Submit
+→ Complaint ID
+→ My Reports
+→ Issue Details
+→ Authority Login
+→ Authority Dashboard
+→ Open Issue
+→ Assign Department
+→ Assign Officer
+→ Change Status
+→ Add Resolution
+→ Upload Before/After Evidence
+→ Awaiting Citizen Verification
+→ Citizen Login
+→ Verify Resolution
+→ RESOLVED
+→ Dashboard/Map/Analytics update
+
+## DESIGN RULE
+
+Do not redesign CivicPulse unless something is clearly broken.
+
+The current design was intentionally created in Lovable.
+
+Keep:
+
+* CivicPulse branding
+* civic-tech visual style
+* colors
+* typography
+* navigation
+* cards
+* dashboards
+* spacing
+* responsive layout
+
+Do not add:
+
+* Lovable branding
+* Replit branding
+* AI platform branding
+* watermarks
+* generic AI imagery
+
+## OUTPUT AFTER AUDIT
+
+Before making large changes, give me a concise report containing:
+
+1. What is already working
+2. What is partially implemented
+3. What is missing
+4. What is broken
+5. Which files/components need modification
+6. The recommended order for completing the remaining prototype
+
+Then start fixing the highest-priority issues.
+
+**Do not rebuild working functionality.**
+
+**Do not replace the entire application with a new template.**
+
+**Continue from the existing GitHub project.**

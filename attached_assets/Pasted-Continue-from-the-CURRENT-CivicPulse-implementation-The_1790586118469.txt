@@ -1,0 +1,819 @@
+Continue from the CURRENT CivicPulse implementation.
+
+The previous audit has confirmed that the core frontend prototype is already working. **Do not rebuild or redesign it.**
+
+The audit found that these major features already work:
+
+* CivicPulse landing page
+* Citizen / Authority / Admin demo roles
+* Centralized issue data
+* localStorage persistence
+* Citizen dashboard
+* Authority dashboard
+* Report workflow
+* Image upload/preview
+* Description
+* Category
+* Location fields
+* Simulated AI analysis
+* Editable AI results
+* Duplicate indicators
+* Complaint ID generation
+* Issue details
+* Authority assignment
+* Status changes
+* Notes
+* Before/after evidence
+* Citizen verification
+* Civic map view
+* Filters
+* Demo heatmap
+* Civic intelligence
+* Analytics
+* Recurring issues
+* Proactive insights
+* Notifications
+* Admin views
+
+**Preserve all of this.**
+
+Now implement only the remaining functionality below.
+
+---
+
+# PHASE 1 — FIX EXISTING BUGS
+
+First fix these exact issues identified by the audit.
+
+### 1. Dashboard navigation
+
+The following buttons currently route incorrectly:
+
+`Explore map`
+
+`Open map`
+
+They must open the **Civic Map** view.
+
+`View insights`
+
+must open the **Civic Intelligence** view.
+
+Do not change the visual design.
+
+### 2. Existing localStorage compatibility
+
+Older issue records may not contain:
+
+* timeline
+* AI summary
+* assignment
+* resolution fields
+* city
+* createdAt
+
+Add a normalization/migration function so older records receive safe defaults.
+
+Do not delete existing demo reports.
+
+---
+
+# PHASE 2 — REAL LIVE LOCATION
+
+This is now a priority feature.
+
+CivicPulse is specifically being demonstrated for:
+
+**Kopargaon, Maharashtra**
+
+**Shrirampur, Maharashtra**
+
+**Shirdi, Maharashtra**
+
+Implement real browser geolocation.
+
+When the citizen creates a report, provide:
+
+### Use My Current Location
+
+When clicked:
+
+1. Request browser location permission.
+2. Get actual latitude.
+3. Get actual longitude.
+4. Display the user's position on the map.
+5. Store latitude/longitude.
+6. Get a human-readable address where possible.
+7. Determine the nearest CivicPulse-supported area.
+8. Display:
+
+   * latitude
+   * longitude
+   * address
+   * city/area
+   * ward if available
+   * timestamp
+
+Use the browser Geolocation API.
+
+Handle:
+
+* permission denied
+* timeout
+* unavailable location
+* unsupported browser
+
+Never crash the report form.
+
+If GPS is unavailable, show:
+
+**Location unavailable — select location manually**
+
+and allow the citizen to select a point on the map.
+
+---
+
+# PHASE 3 — REAL MAP
+
+The existing CSS-based demo map should be upgraded to a real geographic map.
+
+Prefer:
+
+**Leaflet + OpenStreetMap**
+
+If Leaflet is not installed, install the minimum required dependency.
+
+Do not replace the entire existing UI.
+
+The map should support:
+
+* Kopargaon
+* Shrirampur
+* Shirdi
+* actual latitude/longitude
+* user location marker
+* selected report location
+* issue markers
+* marker popups
+* zoom
+* pan
+
+When creating a report:
+
+Citizen can:
+
+**Use My Current Location**
+
+OR
+
+**Select Location on Map**
+
+When the marker moves, update:
+
+latitude
+longitude
+address/location metadata
+
+---
+
+# PHASE 4 — CIVICPULSE LOCATION SERVICE
+
+Extract location functionality into:
+
+`src/services/locationService.ts`
+
+or the project's equivalent service structure.
+
+Provide functions similar to:
+
+`getCurrentLocation()`
+
+`reverseGeocode(latitude, longitude)`
+
+`getNearestCivicArea(latitude, longitude)`
+
+`getWard(latitude, longitude)`
+
+Do not duplicate location logic across components.
+
+If reverse geocoding requires an external service, use a safe implementation.
+
+Do NOT put secret API keys in frontend source code.
+
+If reverse geocoding is unavailable, use a sensible fallback based on coordinates/manual selection.
+
+---
+
+# PHASE 5 — ADD STRUCTURED LOCATION DATA
+
+Every issue should support:
+
+```text
+latitude
+longitude
+address
+city
+area
+ward
+createdAt
+```
+
+For this prototype, supported cities are:
+
+Kopargaon
+Shrirampur
+Shirdi
+
+Use realistic synthetic ward/area demo data.
+
+Clearly mark seeded data as:
+
+**CivicPulse Demo Data**
+
+Do not claim that synthetic ward data is official municipal data.
+
+---
+
+# PHASE 6 — REAL AI IMAGE ANALYSIS
+
+Now upgrade the existing simulated AI architecture.
+
+IMPORTANT:
+
+Do NOT remove the mock AI.
+
+The application must support BOTH:
+
+### Mock mode
+
+and
+
+### Real AI mode
+
+Create a reusable:
+
+`AIService`
+
+with:
+
+```text
+analyzeImage()
+analyzeText()
+detectDuplicates()
+estimateSeverity()
+generateInsights()
+```
+
+The current inline AI logic should be moved into this service where practical.
+
+---
+
+# PHASE 7 — REAL AI PROVIDER
+
+Implement a secure server-side/edge API endpoint for image analysis.
+
+Architecture:
+
+```text
+Citizen uploads image
+        ↓
+CivicPulse frontend
+        ↓
+Secure server/API endpoint
+        ↓
+Vision-capable AI provider
+        ↓
+Structured JSON response
+        ↓
+CivicPulse AI result UI
+```
+
+DO NOT put an AI API key in React/frontend code.
+
+Use Replit Secrets/environment variables.
+
+Use a variable such as:
+
+`AI_API_KEY`
+
+and, if needed:
+
+`AI_PROVIDER`
+
+Do not hard-code secrets.
+
+---
+
+# PHASE 8 — STRUCTURED AI RESULT
+
+The AI analysis should return structured data such as:
+
+```json
+{
+  "category": "Pothole",
+  "severity": "HIGH",
+  "impact": "Vehicle safety risk",
+  "department": "Road Maintenance",
+  "confidence": 91,
+  "summary": "The image appears to show a significant pothole affecting the road surface."
+}
+```
+
+Supported categories:
+
+* Pothole
+* Road Damage
+* Garbage / Overflowing Bin
+* Water Leakage
+* Drainage
+* Broken Streetlight
+* Fallen Tree
+* Damaged Signage
+* Other Infrastructure
+
+Severity:
+
+* LOW
+* MEDIUM
+* HIGH
+* CRITICAL
+
+Departments:
+
+* Road Maintenance
+* Waste Management
+* Water Supply
+* Drainage
+* Electrical / Street Lighting
+* Parks / Trees
+* Public Infrastructure
+* Sanitation
+* Other
+
+---
+
+# PHASE 9 — AI FAILURE FALLBACK
+
+This is mandatory.
+
+If:
+
+* AI API key is missing
+* API fails
+* request times out
+* provider returns invalid data
+* network fails
+
+the report workflow must continue using mock AI.
+
+Create:
+
+`MOCK_AI_MODE=true`
+
+When enabled:
+
+→ use mock AI.
+
+When disabled:
+
+→ attempt real AI.
+
+If real AI fails:
+
+→ gracefully fall back to mock AI.
+
+Show the user an appropriate message such as:
+
+**AI analysis temporarily unavailable. You can continue with assisted classification.**
+
+Never expose API errors or secrets.
+
+---
+
+# PHASE 10 — EDITABLE AI RESULTS
+
+Keep the current editable AI result functionality.
+
+After analysis display:
+
+* Category
+* Severity
+* Impact
+* Department
+* Summary
+* Confidence
+
+Citizen must be able to change the AI recommendation.
+
+Clearly distinguish:
+
+**AI Recommendation**
+
+from
+
+**Citizen Confirmation**
+
+The final submitted values must be the citizen-confirmed values.
+
+---
+
+# PHASE 11 — AI IMAGE PROCESSING
+
+For uploaded images:
+
+* validate file type
+* validate file size
+* show preview
+* allow replace/remove
+* support mobile camera capture where browser supports it
+
+If practical, resize/compress very large images before sending to AI.
+
+Do not store massive image blobs in localStorage.
+
+For this frontend prototype, preserve the existing image behavior unless a safer local representation is necessary.
+
+---
+
+# PHASE 12 — DUPLICATE DETECTION
+
+Keep the current duplicate functionality, but extract it into the AI/issue service architecture where practical.
+
+Compare:
+
+* category
+* geographic distance
+* description similarity
+* time proximity
+
+Show:
+
+**Possible Similar Reports Nearby**
+
+with:
+
+* Complaint ID
+* category
+* distance
+* location
+* status
+* date
+* similarity
+
+Allow:
+
+**View Report**
+
+**Same Issue**
+
+**Continue as New Report**
+
+Never automatically delete a report.
+
+---
+
+# PHASE 13 — REAL SLA CALCULATION
+
+The audit identified that SLA indicators are currently static.
+
+Fix this.
+
+Use:
+
+Critical = 24 hours
+
+High = 48 hours
+
+Medium = 72 hours
+
+Low = 7 days
+
+Clearly label:
+
+**CivicPulse Demo SLA**
+
+**Not an official government SLA**
+
+Calculate SLA from:
+
+`createdAt`
+
+and current time.
+
+Display:
+
+* time remaining
+* due soon
+* on track
+* breached
+
+SLA status must change automatically based on time.
+
+Do not use hard-coded dashboard SLA numbers.
+
+---
+
+# PHASE 14 — ADMIN SETTINGS
+
+The audit says admin settings are currently mostly visual.
+
+Make these functional using the existing localStorage/state architecture.
+
+Admin should be able to modify demo:
+
+* SLA values
+* departments
+* categories
+* priority settings
+* notification settings
+* AI mode
+
+Changes should persist after refresh.
+
+Do not build a real backend.
+
+---
+
+# PHASE 15 — REAL URL ROUTING
+
+The current app uses internal `view` state.
+
+Do not convert the entire application unnecessarily.
+
+However, if the existing framework supports routing cleanly, add routes for the important views:
+
+```text
+/
+ /citizen
+ /report
+ /reports
+ /issues/:id
+ /authority
+ /map
+ /intelligence
+ /admin
+ /notifications
+```
+
+Preserve current navigation behavior.
+
+If converting routes creates significant risk, keep the current view-state architecture and only fix navigation.
+
+Do not spend excessive tokens on routing.
+
+---
+
+# PHASE 16 — CENTRALIZED MOCK SERVICES
+
+Create reusable services only where useful.
+
+Suggested structure:
+
+```text
+src/services/
+  authService
+  issueService
+  aiService
+  locationService
+  notificationService
+  analyticsService
+```
+
+Do not duplicate business logic.
+
+The same issue must remain synchronized across:
+
+Citizen
+Authority
+Map
+Analytics
+Notifications
+Verification
+
+---
+
+# PHASE 17 — COMPLETE END-TO-END WORKFLOW
+
+After implementation, test this exact workflow.
+
+### CITIZEN
+
+Login as:
+
+`citizen.demo@example.com`
+
+Open:
+
+**Report Issue**
+
+Upload a real test image.
+
+Enter:
+
+“This road has a large pothole near the main road.”
+
+Click:
+
+**Use My Current Location**
+
+Confirm real browser coordinates appear.
+
+Confirm the map displays the position.
+
+Confirm address/location metadata.
+
+Run AI analysis.
+
+Confirm AI analyzes the image.
+
+Confirm:
+
+Category
+Severity
+Impact
+Department
+Summary
+Confidence
+
+Edit one AI field.
+
+Review.
+
+Check duplicate suggestions.
+
+Submit.
+
+Generate:
+
+`CP-2026-XXXXX`
+
+---
+
+### AUTHORITY
+
+Login as:
+
+`authority.demo@example.com`
+
+Confirm the SAME complaint appears.
+
+Open it.
+
+Assign:
+
+Department
+
+Officer
+
+Change status:
+
+NEW
+→ UNDER REVIEW
+→ ASSIGNED
+→ IN PROGRESS
+
+Add note.
+
+Upload:
+
+Before image
+
+After image
+
+Add resolution notes.
+
+Submit resolution.
+
+Status:
+
+**AWAITING CITIZEN VERIFICATION**
+
+---
+
+### CITIZEN
+
+Return to citizen.
+
+Open notification.
+
+Open report.
+
+See:
+
+**Has this issue actually been resolved?**
+
+Click:
+
+**YES, RESOLVED**
+
+Issue becomes:
+
+**RESOLVED**
+
+Verify that:
+
+* Citizen dashboard updates
+* Authority dashboard updates
+* Map updates
+* Analytics updates
+* Notification updates
+
+---
+
+### REOPEN TEST
+
+Use another issue.
+
+Authority submits resolution.
+
+Citizen clicks:
+
+**NO, STILL EXISTS**
+
+Issue must become:
+
+**REOPENED**
+
+Authority must see the reopened state.
+
+---
+
+# PHASE 18 — TEST ERROR STATES
+
+Test:
+
+* GPS permission denied
+* GPS unavailable
+* AI API unavailable
+* AI key missing
+* invalid image
+* oversized image
+* empty description
+* map unavailable
+
+Every failure should have a usable fallback.
+
+---
+
+# PHASE 19 — FINAL QUALITY
+
+Run:
+
+`npm run build`
+
+Run:
+
+`npx tsc --noEmit`
+
+Fix all application errors.
+
+Ignore only development-tooling warnings that are unrelated to CivicPulse behavior.
+
+Test:
+
+* desktop
+* tablet
+* mobile
+
+Do not redesign the application.
+
+---
+
+# PHASE 20 — DO NOT WASTE TOKENS
+
+Do NOT:
+
+* rebuild existing pages
+* replace CivicPulse branding
+* create a new template
+* rewrite working dashboards
+* add unnecessary libraries
+* add a real database
+* add Supabase
+* add payment systems
+* add email/SMS
+* create unnecessary backend architecture
+* remove existing demo data
+* remove working features
+
+Make targeted changes.
+
+---
+
+# FINAL OUTPUT
+
+When finished, report:
+
+1. Files changed
+2. Live location implementation
+3. Map implementation
+4. AI implementation
+5. AI provider configuration required
+6. Environment variables required
+7. Mock AI fallback behavior
+8. SLA implementation
+9. Admin persistence
+10. End-to-end workflow test result
+11. Remaining limitations, if any
+
+The final application should feel like a **complete working CivicPulse prototype for Kopargaon, Shrirampur and Shirdi**, with real browser location and real AI image analysis when configured, while remaining fully usable in mock mode.
