@@ -146,7 +146,7 @@ export const defaultCivicSettings: CivicSettings = {
   categories: [...categories],
   enabledPriorities: ["Critical", "High", "Medium", "Low"],
   notificationsEnabled: true,
-  aiMode: "mock",
+  aiMode: "real",
   aiConfidenceThreshold: 85,
   duplicateRadiusMeters: 500,
 };

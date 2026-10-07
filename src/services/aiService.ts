@@ -26,7 +26,7 @@ export type DuplicateSuggestion = {
 };
 
 const isMockMode = (mode?: "mock" | "real") =>
-  mode === "mock" || import.meta.env["VITE_MOCK_AI_MODE"] !== "false";
+  mode === "mock" || (mode !== "real" && import.meta.env["VITE_MOCK_AI_MODE"] === "true");
 
 function mockAnalysis(description: string, location?: string): AIAnalysis {
   const text = description.toLowerCase();
