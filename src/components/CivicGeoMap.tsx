@@ -34,7 +34,7 @@ export function CivicGeoMap({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import("leaflet").Map | null>(null);
   const layerRef = useRef<import("leaflet").LayerGroup | null>(null);
-  const leafletRef = useRef<typeof import("leaflet").default | null>(null);
+  const leafletRef = useRef<typeof import("leaflet") | null>(null);
   const locationSelectRef = useRef(onLocationSelect);
   const issueOpenRef = useRef(onIssue);
 
@@ -45,20 +45,23 @@ export function CivicGeoMap({
 
   useEffect(() => {
     let disposed = false;
-    void import("leaflet").then(({ default: L }) => {
+    void import("leaflet").then((mod) => {
+      const L =
+        (mod as unknown as { default?: typeof import("leaflet") }).default ??
+        (mod as unknown as typeof import("leaflet"));
       if (disposed || !containerRef.current || mapRef.current) return;
       const initial = selectedPosition ?? defaultPosition;
       const map = L.map(containerRef.current, {
         zoomControl: true,
         attributionControl: true,
-      }).setView([initial.latitude, initial.longitude], 10);
+      }).setView([initial.latitude, initial.longitude], 11);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
         attribution: "&copy; OpenStreetMap contributors",
       }).addTo(map);
       const layer = L.layerGroup().addTo(map);
       if (interactive) {
-        map.on("click", (event) =>
+        map.on("click", (event: { latlng: { lat: number; lng: number } }) =>
           locationSelectRef.current?.({
             latitude: event.latlng.lat,
             longitude: event.latlng.lng,
@@ -69,7 +72,7 @@ export function CivicGeoMap({
       leafletRef.current = L;
       mapRef.current = map;
       layerRef.current = layer;
-      window.setTimeout(() => map.invalidateSize(), 0);
+      window.setTimeout(() => map.invalidateSize(), 100);
     });
 
     return () => {
@@ -79,7 +82,7 @@ export function CivicGeoMap({
       layerRef.current = null;
       leafletRef.current = null;
     };
-  }, [interactive, selectedPosition]);
+  }, [interactive]);
 
   useEffect(() => {
     const map = mapRef.current;

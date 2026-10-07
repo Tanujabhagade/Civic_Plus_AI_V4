@@ -61,10 +61,12 @@ import {
   initialNotifications,
   officers,
   wards,
+  civicAreas,
   type CivicIssue,
   type CivicRole,
   type CivicSettings,
   type CivicStatus,
+  type CivicTimelineEvent,
 } from "@/lib/civic-data";
 import {
   analyzeImage,
@@ -138,7 +140,7 @@ const priorityStyle = (priority: CivicIssue["priority"]) =>
       : priority === "Medium"
         ? "bg-amber-100 text-amber-800"
         : "bg-slate-100 text-slate-700";
-const defaultTimeline = (): CivicIssue["timeline"] => [
+const defaultTimeline = (): CivicTimelineEvent[] => [
   { label: "Report submitted", detail: "Citizen report received", at: "Saved", done: true },
   { label: "AI triage complete", detail: "Assisted classification", at: "Saved", done: true },
   { label: "Municipal review", detail: "Awaiting assignment", at: "Next", done: false },
@@ -1136,41 +1138,20 @@ function Dashboard({
           <div className="flex items-center justify-between border-b border-border px-4 py-4">
             <div>
               <h2 className="text-[14px] font-semibold">Issues near you</h2>
-              <p className="mt-1 text-[11px] text-muted-foreground">Central Pune · Ward 12</p>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Kopargaon · Shrirampur · Shirdi
+              </p>
             </div>
-            <Button variant="ghost" size="icon" aria-label="Open map" onClick={onViewAll}>
+            <Button variant="ghost" size="icon" aria-label="Open map" onClick={onOpenMap}>
               <ArrowRight />
             </Button>
           </div>
-          <div className="civic-map civic-grid relative h-[230px]">
-            {issues.slice(0, 12).map((issue) => (
-              <button
-                key={issue.id}
-                aria-label={`Open ${issue.id}`}
-                title={issue.title}
-                onClick={() => onIssue(issue.id)}
-                className={`absolute h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-card shadow ${issue.priority === "Critical" ? "bg-rose-600" : issue.priority === "High" ? "bg-orange-500" : issue.priority === "Medium" ? "bg-amber-500" : "bg-emerald-600"}`}
-                style={{ left: `${issue.left}%`, top: `${issue.top}%` }}
-              />
-            ))}
-            <div className="absolute bottom-3 left-3 flex gap-3 bg-card px-3 py-2 text-[9px] text-muted-foreground shadow">
-              <span className="flex items-center gap-1">
-                <i className="h-2 w-2 rounded-full bg-rose-600" />
-                Critical
-              </span>
-              <span className="flex items-center gap-1">
-                <i className="h-2 w-2 rounded-full bg-orange-500" />
-                High
-              </span>
-              <span className="flex items-center gap-1">
-                <i className="h-2 w-2 rounded-full bg-amber-500" />
-                Medium
-              </span>
-            </div>
-          </div>
+          <CivicGeoMap issues={issues.slice(0, 15)} onIssue={onIssue} height="230px" />
           <div className="flex items-center justify-between p-4">
-            <span className="text-[11px] text-muted-foreground">24 issues within 2 km</span>
-            <Button variant="outline" size="sm" onClick={onViewAll}>
+            <span className="text-[11px] text-muted-foreground">
+              {issues.length} active civic reports
+            </span>
+            <Button variant="outline" size="sm" onClick={onOpenMap}>
               Explore map <MapPin />
             </Button>
           </div>
@@ -1180,16 +1161,16 @@ function Dashboard({
         <section className="border border-border bg-card p-5">
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary" />
-            <h2 className="text-[13px] font-semibold">Civic pulse · Ward 12</h2>
+            <h2 className="text-[13px] font-semibold">Civic pulse · Supported areas</h2>
           </div>
           <p className="mt-3 text-[12px] leading-5 text-muted-foreground">
             Drainage complaints have increased{" "}
             <strong className="font-semibold text-foreground">42%</strong> this month. An inspection
-            near Deccan Gymkhana may help prevent repeat flooding.
+            near Kopargaon Main Road may help prevent repeat flooding.
           </p>
           <div className="mt-4 flex items-center justify-between border-t border-border pt-3 text-[10px] text-muted-foreground">
             <span>Potential recurring issue · Demo insight</span>
-            <Button variant="link" className="h-auto p-0 text-[11px]" onClick={onViewAll}>
+            <Button variant="link" className="h-auto p-0 text-[11px]" onClick={onOpenIntelligence}>
               View insights
             </Button>
           </div>
@@ -1228,10 +1209,14 @@ function Badge({ className, children }: { className: string; children: React.Rea
 }
 
 function ReportWizard({
+  existingIssues = [],
+  settings,
   onCancel,
   onTrack,
   onSubmit,
 }: {
+  existingIssues?: CivicIssue[];
+  settings?: CivicSettings;
   onCancel: () => void;
   onTrack: () => void;
   onSubmit: (issue: CivicIssue) => void;
@@ -1242,76 +1227,215 @@ function ReportWizard({
   const [category, setCategory] = useState(categories[0] ?? "Infrastructure");
   const [priority, setPriority] = useState<CivicIssue["priority"]>("High");
   const [department, setDepartment] = useState(departments[0] ?? "Road Maintenance");
-  const [location, setLocation] = useState("FC Road, Pune");
+  const [locationMeta, setLocationMeta] = useState<LocationMeta>(() => fallbackLocation());
+  const [locating, setLocating] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
   const [image, setImage] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
-  const [linked, setLinked] = useState(false);
+  const [linkedIssueId, setLinkedIssueId] = useState<string | null>(null);
+  const [aiResult, setAiResult] = useState<AIAnalysis | null>(null);
+  const [aiErrorNotice, setAiErrorNotice] = useState<string | null>(null);
+  const [detectedDuplicates, setDetectedDuplicates] = useState<DuplicateSuggestion[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
   const steps = ["Report", "Location", "AI analysis", "Review", "Submitted"];
-  const analyze = () => {
-    if (!description.trim()) {
-      toast.error("Add a short description before analysis");
+
+  const handleUseGps = async () => {
+    setLocating(true);
+    setLocationError(null);
+    try {
+      const coords = await getCurrentLocation();
+      const resolved = await resolveLocation(coords.latitude, coords.longitude, "gps");
+      setLocationMeta(resolved);
+      toast.success(`Acquired location: ${resolved.area || resolved.city}`);
+    } catch (err) {
+      const msg =
+        err instanceof LocationServiceError
+          ? err.message
+          : "Unable to retrieve your current location. Please select a location manually.";
+      setLocationError(msg);
+      toast.error(msg);
+    } finally {
+      setLocating(false);
+    }
+  };
+
+  const handleMapLocationSelect = async (pos: MapPosition) => {
+    setLocationError(null);
+    try {
+      const resolved = await resolveLocation(pos.latitude, pos.longitude, "manual");
+      setLocationMeta(resolved);
+      toast.success(`Selected on map: ${resolved.area || resolved.city}`);
+    } catch {
+      const nearest = civicAreas[0];
+      setLocationMeta({
+        latitude: pos.latitude,
+        longitude: pos.longitude,
+        address: pos.label ?? nearest.address,
+        city: nearest.city,
+        area: nearest.area,
+        ward: nearest.ward,
+        timestamp: new Date().toISOString(),
+        source: "manual",
+      });
+    }
+  };
+
+  const analyze = async () => {
+    if (!description.trim() && !image) {
+      toast.error("Please add a description or a photo before analysis");
       return;
     }
     setAnalyzing(true);
-    window.setTimeout(() => {
-      setAnalyzing(false);
+    setAiErrorNotice(null);
+    try {
+      const locationContext = `${locationMeta.address}, ${locationMeta.city} (${locationMeta.ward})`;
+      const result = await analyzeImage(
+        image || undefined,
+        description,
+        settings?.aiMode,
+        locationContext,
+      );
+      setAiResult(result);
+      setCategory(result.category);
+      setPriority(result.severity);
+      setDepartment(result.department);
+
+      // Check duplicates dynamically with current location & text
+      const duplicates = detectDuplicates(
+        {
+          category: result.category,
+          description: description || result.summary,
+          latitude: locationMeta.latitude,
+          longitude: locationMeta.longitude,
+        },
+        existingIssues,
+        settings?.duplicateRadiusMeters ?? 500,
+      );
+      setDetectedDuplicates(duplicates);
+
+      if (result.usedMock && result.mockReason) {
+        setAiErrorNotice(
+          "AI analysis temporarily unavailable. You can continue with assisted classification.",
+        );
+      }
       setStep(1);
-    }, 1100);
+    } catch {
+      setAiErrorNotice(
+        "AI analysis temporarily unavailable. You can continue with assisted classification.",
+      );
+      setStep(1);
+    } finally {
+      setAnalyzing(false);
+    }
   };
+
+  // Re-run duplicate detection whenever location changes
+  const runDuplicateScan = (newMeta: LocationMeta) => {
+    const duplicates = detectDuplicates(
+      {
+        category,
+        description,
+        latitude: newMeta.latitude,
+        longitude: newMeta.longitude,
+      },
+      existingIssues,
+      settings?.duplicateRadiusMeters ?? 500,
+    );
+    setDetectedDuplicates(duplicates);
+  };
+
   const submit = () => {
     const newId = `CIV-2026-${String(Date.now()).slice(-5)}`;
     setSubmittedId(newId);
     onSubmit({
       id: newId,
-      title: description.length > 48 ? `${description.slice(0, 45)}…` : description,
+      title: description.length > 48 ? `${description.slice(0, 45)}…` : description || category,
       category,
-      location,
-      ward: "Ward 12",
+      location: locationMeta.address,
+      ward: locationMeta.ward,
       department,
       priority,
       status: "NEW",
       age: "Just now",
       citizen: "Rahul Sharma",
-      description,
-      confidence: 94,
-      lat: 18.5204,
-      longitude: 73.8567,
-      left: 54,
-      top: 42,
-      image,
-      aiSummary: `AI found a likely ${category.toLowerCase()} concern near ${location}.`,
-      impact: "May affect daily movement and neighborhood safety.",
-      duplicateIds: linked ? ["CIV-2026-00119"] : [],
+      description: description || `Reported ${category.toLowerCase()} condition.`,
+      confidence: aiResult?.confidence ?? 92,
+      lat: locationMeta.latitude,
+      left: 50,
+      top: 50,
+      latitude: locationMeta.latitude,
+      longitude: locationMeta.longitude,
+      address: locationMeta.address,
+      city: locationMeta.city,
+      area: locationMeta.area,
+      createdAt: new Date().toISOString(),
+      ...(image ? { image } : {}),
+      aiSummary:
+        aiResult?.summary ??
+        `AI found a likely ${category.toLowerCase()} concern near ${locationMeta.address}.`,
+      impact:
+        aiResult?.impact ??
+        (priority === "Critical"
+          ? "Critical safety hazard requiring immediate attention."
+          : priority === "High"
+            ? "May disrupt local movement and public safety."
+            : "Localized disruption reported by residents."),
+      duplicateIds: linkedIssueId ? [linkedIssueId] : [],
       notes: [],
-      timeline: [
-        {
-          label: "Report submitted",
-          detail: "Citizen report received",
-          at: "Just now",
-          done: true,
-        },
-        {
-          label: "AI triage complete",
-          detail: `${category} · ${priority}`,
-          at: "Just now",
-          done: true,
-        },
-        { label: "Municipal review", detail: "Awaiting assignment", at: "Next", done: false },
-        { label: "Resolution", detail: "Not submitted", at: "Pending", done: false },
-      ],
+      timeline: defaultTimeline(),
     });
     setStep(4);
   };
+
   const loadImage = (file?: File) => {
     if (!file) return;
     if (!file.type.startsWith("image/")) {
-      toast.error("Choose an image file to continue");
+      toast.error("Choose an image file (PNG, JPG, WebP) to continue");
       return;
     }
-    setImage(URL.createObjectURL(file));
+    // Validate maximum file size (15MB)
+    if (file.size > 15 * 1024 * 1024) {
+      toast.error("Image file is too large (maximum 15MB)");
+      return;
+    }
+
+    // Resize/compress client-side to ensure responsive transmission
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const src = e.target?.result as string;
+      const img = new Image();
+      img.onload = () => {
+        const maxWidth = 1200;
+        const maxHeight = 1200;
+        let width = img.width;
+        let height = img.height;
+        if (width > maxWidth || height > maxHeight) {
+          if (width > height) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          } else {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressed = canvas.toDataURL("image/jpeg", 0.85);
+          setImage(compressed);
+        } else {
+          setImage(src);
+        }
+      };
+      img.src = src;
+    };
+    reader.readAsDataURL(file);
   };
+
   return (
     <div className="mx-auto max-w-[880px]">
       <div className="mb-6 flex items-center justify-between">
@@ -1320,7 +1444,7 @@ function ReportWizard({
           Back to overview
         </Button>
         <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Secure civic reporting
+          Secure civic reporting · AI Triage
         </span>
       </div>
       <PageHeading
@@ -1357,7 +1481,7 @@ function ReportWizard({
         <section className="border border-border bg-card p-5 md:p-7">
           <h2 className="text-[15px] font-semibold">What needs attention?</h2>
           <p className="mt-1 text-[12px] text-muted-foreground">
-            A photo and a few details help the right team respond.
+            A photo and a few details help the AI and municipal teams respond quickly.
           </p>
           <div
             onDragOver={(event) => event.preventDefault()}
@@ -1374,17 +1498,21 @@ function ReportWizard({
                   alt="Selected civic issue"
                   className="max-h-[220px] max-w-full object-contain"
                 />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-3"
-                  onClick={() => {
-                    setImage("");
-                    if (fileRef.current) fileRef.current.value = "";
-                  }}
-                >
-                  Remove photo
-                </Button>
+                <div className="mt-3 flex justify-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
+                    Replace photo
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setImage("");
+                      if (fileRef.current) fileRef.current.value = "";
+                    }}
+                  >
+                    Remove photo
+                  </Button>
+                </div>
               </div>
             ) : (
               <div>
@@ -1393,7 +1521,7 @@ function ReportWizard({
                 </div>
                 <div className="mt-3 text-[13px] font-semibold">Add a photo of the issue</div>
                 <div className="mt-1 text-[11px] text-muted-foreground">
-                  Drop an image here or choose from your device
+                  Drop an image here or choose from your device (JPG, PNG up to 15MB)
                 </div>
                 <div className="mt-4 flex justify-center gap-2">
                   <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
@@ -1423,18 +1551,18 @@ function ReportWizard({
             id="issue-description"
             value={description}
             onChange={(event) => setDescription(event.target.value)}
-            placeholder="There is a large pothole near the school entrance and several bikes are having difficulty passing."
+            placeholder="e.g. Large pothole near the school entrance and multiple bikes are swerving dangerously."
             className="mt-2 min-h-[105px] resize-y bg-card text-[13px]"
           />
           <p className="mt-2 text-[10px] text-muted-foreground">
-            Be specific about what you noticed and how it affects the area.
+            Be specific about what you noticed and how it affects pedestrian and vehicle movement.
           </p>
           <div className="mt-6 flex justify-end">
             <Button className="h-10" disabled={analyzing} onClick={analyze}>
               {analyzing ? (
                 <>
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                  Analyzing issue…
+                  Analyzing with AI…
                 </>
               ) : (
                 <>
@@ -1447,49 +1575,129 @@ function ReportWizard({
       )}
       {step === 1 && (
         <section className="border border-border bg-card p-5 md:p-7">
-          <h2 className="text-[15px] font-semibold">Confirm the issue location</h2>
-          <p className="mt-1 text-[12px] text-muted-foreground">
-            A nearby address helps route the report to the right ward.
-          </p>
-          <div className="mt-5 flex flex-col gap-2 sm:flex-row">
-            <Input
-              value={location}
-              onChange={(event) => setLocation(event.target.value)}
-              aria-label="Search location"
-              placeholder="Search street, landmark or area"
-              className="h-10"
-            />
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-[15px] font-semibold">Confirm the issue location</h2>
+              <p className="mt-1 text-[12px] text-muted-foreground">
+                Supported areas: Kopargaon, Shrirampur, Shirdi. Click on the map or use GPS.
+              </p>
+            </div>
             <Button
               variant="outline"
+              disabled={locating}
               className="h-10 shrink-0"
-              onClick={() => {
-                setLocation("FC Road, Pune");
-                toast.success("Using demo location near FC Road");
-              }}
+              onClick={handleUseGps}
             >
-              <LocateFixed />
-              Use current location
+              {locating ? (
+                <>
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  Acquiring GPS…
+                </>
+              ) : (
+                <>
+                  <LocateFixed />
+                  Use My Current Location
+                </>
+              )}
             </Button>
           </div>
-          <div className="civic-map civic-grid relative mt-4 h-[300px] overflow-hidden border border-border">
-            {["FC Road, Pune", "Deccan Gymkhana", "Shivajinagar", "JM Road"].map((place, index) => (
-              <button
-                key={place}
-                className={`absolute flex items-center gap-1.5 border px-2 py-1.5 text-[10px] shadow-sm ${location === place ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card"}`}
-                style={{ left: `${[28, 57, 41, 72][index]}%`, top: `${[32, 54, 72, 25][index]}%` }}
-                onClick={() => setLocation(place)}
+
+          {locationError && (
+            <div className="mt-3 flex items-center gap-2 border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] text-rose-800">
+              <AlertTriangle className="h-4 w-4 shrink-0 text-rose-600" />
+              <span>{locationError}</span>
+            </div>
+          )}
+
+          <div className="mt-4 flex flex-col gap-1.5">
+            <label className="text-[11px] font-semibold text-muted-foreground">
+              Address / Landmark
+            </label>
+            <Input
+              value={locationMeta.address}
+              onChange={(event) => {
+                const updated = {
+                  ...locationMeta,
+                  address: event.target.value,
+                  source: "manual" as const,
+                };
+                setLocationMeta(updated);
+                runDuplicateScan(updated);
+              }}
+              aria-label="Search or enter location"
+              placeholder="e.g. Main Road, Kopargaon"
+              className="h-10"
+            />
+          </div>
+
+          <div className="mt-4">
+            <div className="mb-2 flex items-center justify-between text-[11px]">
+              <span className="font-semibold text-muted-foreground">
+                Select location on map (Click anywhere on map to update pin):
+              </span>
+              <span className="text-[10px] text-muted-foreground">
+                Pin: {locationMeta.latitude.toFixed(4)}° N, {locationMeta.longitude.toFixed(4)}° E
+              </span>
+            </div>
+            <CivicGeoMap
+              selectedPosition={{
+                latitude: locationMeta.latitude,
+                longitude: locationMeta.longitude,
+                label: locationMeta.address || "Selected report location",
+              }}
+              onLocationSelect={(pos) => {
+                handleMapLocationSelect(pos);
+                runDuplicateScan({
+                  ...locationMeta,
+                  latitude: pos.latitude,
+                  longitude: pos.longitude,
+                });
+              }}
+              height="280px"
+              interactive={true}
+            />
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="text-[10px] font-semibold text-muted-foreground">
+              Quick select demo area:
+            </span>
+            {civicAreas.slice(0, 3).map((area) => (
+              <Button
+                key={area.area}
+                type="button"
+                variant={locationMeta.area === area.area ? "default" : "outline"}
+                size="sm"
+                className="h-7 text-[10px]"
+                onClick={() => {
+                  setLocationError(null);
+                  const selectedMeta: LocationMeta = {
+                    latitude: area.latitude,
+                    longitude: area.longitude,
+                    address: area.address,
+                    city: area.city,
+                    area: area.area,
+                    ward: area.ward,
+                    timestamp: new Date().toISOString(),
+                    source: "manual",
+                  };
+                  setLocationMeta(selectedMeta);
+                  runDuplicateScan(selectedMeta);
+                  toast.success(`Selected ${area.city} · ${area.area}`);
+                }}
               >
                 <MapPin className="h-3 w-3" />
-                {place}
-              </button>
+                {area.city} ({area.area})
+              </Button>
             ))}
           </div>
+
           <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {[
-              { label: "Address", value: location },
-              { label: "Ward", value: "Ward 12" },
-              { label: "Latitude", value: "18.5204° N" },
-              { label: "Longitude", value: "73.8567° E" },
+              { label: "City", value: locationMeta.city },
+              { label: "Ward", value: locationMeta.ward },
+              { label: "Latitude", value: `${locationMeta.latitude.toFixed(4)}° N` },
+              { label: "Longitude", value: `${locationMeta.longitude.toFixed(4)}° E` },
             ].map((item) => (
               <div key={item.label} className="border border-border p-3">
                 <div className="text-[9px] font-bold uppercase tracking-wide text-muted-foreground">
@@ -1499,13 +1707,14 @@ function ReportWizard({
               </div>
             ))}
           </div>
+
           <div className="mt-6 flex justify-between">
             <Button variant="outline" onClick={() => setStep(0)}>
               <ArrowLeft />
               Back
             </Button>
             <Button onClick={() => setStep(2)}>
-              Continue <ArrowRight />
+              Review AI analysis <ArrowRight />
             </Button>
           </div>
         </section>
@@ -1514,43 +1723,67 @@ function ReportWizard({
         <section className="border border-border bg-card p-5 md:p-7">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h2 className="text-[15px] font-semibold">AI analysis · Review suggestions</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-[15px] font-semibold">AI analysis · Review suggestions</h2>
+                <Badge variant="outline" className="text-[10px] uppercase">
+                  {aiResult?.usedMock ? "Assisted Model" : "Gemini Vision AI"}
+                </Badge>
+              </div>
               <p className="mt-1 text-[12px] text-muted-foreground">
-                Demo analysis · Suggestions are editable before submission.
+                AI recommendations are advisory only. All values are editable before submission.
               </p>
             </div>
             <span className="flex items-center gap-1.5 border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-800">
               <CheckCircle2 className="h-3.5 w-3.5" />
-              94% confidence
+              {aiResult?.confidence ?? 94}% confidence
             </span>
           </div>
+
+          {aiErrorNotice && (
+            <div className="mt-3 flex items-center gap-2 border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
+              <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
+              <span>{aiErrorNotice}</span>
+            </div>
+          )}
+
           <div className="mt-5 grid gap-5 md:grid-cols-[.8fr_1.2fr]">
             {image ? (
-              <img src={image} alt="Issue evidence" className="h-[200px] w-full object-cover" />
+              <img src={image} alt="Issue evidence" className="h-[210px] w-full object-cover" />
             ) : (
-              <div className="civic-map grid h-[200px] place-items-center text-primary">
+              <div className="civic-map grid h-[210px] place-items-center text-primary">
                 <MapPin className="h-8 w-8" />
               </div>
             )}
             <div className="grid grid-cols-2 gap-3">
               {[
-                { label: "Category", value: category, options: categories, change: setCategory },
                 {
-                  label: "Severity",
+                  label: "Category (Citizen confirmed)",
+                  value: category,
+                  options: categories,
+                  change: setCategory,
+                  aiOriginal: aiResult?.category,
+                },
+                {
+                  label: "Severity (Citizen confirmed)",
                   value: priority,
                   options: ["Critical", "High", "Medium", "Low"],
                   change: (value: string) => setPriority(value as CivicIssue["priority"]),
+                  aiOriginal: aiResult?.severity,
                 },
                 {
-                  label: "Department",
+                  label: "Department (Citizen confirmed)",
                   value: department,
                   options: departments,
                   change: setDepartment,
+                  aiOriginal: aiResult?.department,
                 },
               ].map((item) => (
                 <label key={item.label} className="block">
-                  <span className="text-[10px] font-semibold text-muted-foreground">
-                    {item.label}
+                  <span className="flex items-center justify-between text-[10px] font-semibold text-muted-foreground">
+                    <span>{item.label}</span>
+                    {item.aiOriginal && item.aiOriginal !== item.value && (
+                      <span className="text-[9px] text-primary">(AI: {item.aiOriginal})</span>
+                    )}
                   </span>
                   <select
                     aria-label={item.label}
@@ -1566,55 +1799,126 @@ function ReportWizard({
               ))}
               <div className="border border-border bg-accent/50 p-3">
                 <div className="text-[9px] font-bold uppercase text-muted-foreground">
-                  Detected signals
+                  AI Assessment
                 </div>
-                <div className="mt-2 flex flex-wrap gap-1">
-                  {["Pothole", "Road safety", "Traffic"].map((tag) => (
-                    <span key={tag} className="bg-card px-2 py-1 text-[9px]">
-                      {tag}
-                    </span>
-                  ))}
+                <div className="mt-1.5 text-[11px] font-medium leading-tight">
+                  {aiResult?.detectedProblem || category}
+                </div>
+                <div className="mt-1 text-[10px] text-muted-foreground">
+                  {aiResult?.reasoning || "Triage based on civic impact and safety factors."}
                 </div>
               </div>
             </div>
           </div>
+
           <label className="mt-5 block text-[11px] font-semibold">Report description</label>
           <Textarea
             value={description}
             onChange={(event) => setDescription(event.target.value)}
             className="mt-2 min-h-[85px] text-[12px]"
           />
+
           <div className="mt-4 border-l-2 border-primary bg-background px-4 py-3 text-[11px] leading-5 text-muted-foreground">
-            Potentially 3 similar reports found nearby. AI suggestions are simulated for this
-            demonstration.
+            <span className="font-semibold text-foreground">AI summary: </span>
+            {aiResult?.summary ?? `Analysis generated for this ${category.toLowerCase()} report.`}
+            {aiResult?.impact && (
+              <span className="block mt-1">
+                <strong className="text-foreground">Impact: </strong>
+                {aiResult.impact}
+              </span>
+            )}
           </div>
+
+          {/* Dynamic Duplicate Detection Box */}
+          {detectedDuplicates.length > 0 && (
+            <div className="mt-5 border border-amber-300 bg-amber-50/50 p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-[12px] font-semibold text-amber-900">
+                  <Layers3 className="h-4 w-4 text-amber-700" />
+                  Possible Similar Reports Nearby ({detectedDuplicates.length} found)
+                </div>
+                <span className="text-[10px] text-amber-800">
+                  Radius: {settings?.duplicateRadiusMeters ?? 500} m
+                </span>
+              </div>
+              <p className="mt-1 text-[11px] text-amber-900/80">
+                You can link your report to an existing ticket to avoid duplicate municipal
+                dispatches, or proceed with a new complaint.
+              </p>
+              <div className="mt-3 space-y-2">
+                {detectedDuplicates.map((dup) => {
+                  const isLinked = linkedIssueId === dup.issueId;
+                  return (
+                    <div
+                      key={dup.issueId}
+                      className={`flex flex-wrap items-center justify-between gap-3 border p-3 ${isLinked ? "border-emerald-500 bg-emerald-50" : "border-amber-200 bg-background"}`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 text-[12px] font-semibold">
+                          <span>{dup.issueId}</span>
+                          <span className="text-muted-foreground">·</span>
+                          <span>{dup.category}</span>
+                          <Badge variant="outline" className="text-[9px]">
+                            {dup.similarity}% match
+                          </Badge>
+                        </div>
+                        <div className="mt-0.5 text-[11px] text-muted-foreground">
+                          {dup.location} · {dup.distance} away · Status: {prettyStatus(dup.status)}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {isLinked ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 border-emerald-500 text-emerald-800 text-[11px]"
+                            onClick={() => {
+                              setLinkedIssueId(null);
+                              toast.info("Unlinked from ticket");
+                            }}
+                          >
+                            <Check className="h-3 w-3 mr-1" />
+                            Linked
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 text-[11px]"
+                            onClick={() => {
+                              setLinkedIssueId(dup.issueId);
+                              toast.success(`Linked to ticket ${dup.issueId}`);
+                            }}
+                          >
+                            Link to this report
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="mt-6 flex flex-wrap justify-between gap-2">
             <Button variant="outline" onClick={() => setStep(1)}>
               <ArrowLeft />
               Location
             </Button>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setLinked(true);
-                  toast.success("Linked to the nearby pothole report");
-                }}
-              >
-                Link similar issue
-              </Button>
-              <Button
-                onClick={() => {
-                  setConfirmed(true);
-                  setStep(3);
-                }}
-              >
-                Confirm analysis <ArrowRight />
-              </Button>
-            </div>
+            <Button
+              onClick={() => {
+                setConfirmed(true);
+                setStep(3);
+              }}
+            >
+              Confirm analysis <ArrowRight />
+            </Button>
           </div>
-          {linked && (
-            <p className="mt-3 text-right text-[10px] text-emerald-700">Linked to CIV-2026-00119</p>
+          {linkedIssueId && (
+            <p className="mt-3 text-right text-[10px] text-emerald-700 font-semibold">
+              ✓ Will link to existing ticket {linkedIssueId}
+            </p>
           )}
           {confirmed && <span className="sr-only">Analysis confirmed</span>}
         </section>
@@ -1623,7 +1927,7 @@ function ReportWizard({
         <section className="border border-border bg-card p-5 md:p-7">
           <h2 className="text-[15px] font-semibold">Review your report</h2>
           <p className="mt-1 text-[12px] text-muted-foreground">
-            Check the details before sending this to the city team.
+            Check the confirmed details before sending this to the municipal team.
           </p>
           <div className="mt-5 grid gap-5 sm:grid-cols-[220px_1fr]">
             {image ? (
@@ -1640,14 +1944,25 @@ function ReportWizard({
             <div>
               <div className="flex flex-wrap gap-2">
                 <Badge className={priorityStyle(priority)}>{priority} priority</Badge>
-                <Badge className="bg-accent text-accent-foreground">94% AI confidence</Badge>
+                <Badge className="bg-accent text-accent-foreground">
+                  {aiResult?.confidence ?? 94}% AI confidence
+                </Badge>
+                {linkedIssueId && (
+                  <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300">
+                    Linked to {linkedIssueId}
+                  </Badge>
+                )}
               </div>
               <h3 className="mt-3 text-[15px] font-semibold">{category}</h3>
-              <p className="mt-2 text-[12px] leading-5 text-muted-foreground">{description}</p>
+              <p className="mt-2 text-[12px] leading-5 text-muted-foreground">
+                {description || "No additional description provided."}
+              </p>
               <div className="mt-4 grid grid-cols-2 gap-3 border-t border-border pt-3">
                 <div>
                   <div className="text-[9px] uppercase text-muted-foreground">Location</div>
-                  <div className="mt-1 text-[11px] font-medium">{location} · Ward 12</div>
+                  <div className="mt-1 text-[11px] font-medium">
+                    {locationMeta.address} · {locationMeta.ward} ({locationMeta.city})
+                  </div>
                 </div>
                 <div>
                   <div className="text-[9px] uppercase text-muted-foreground">Assigned team</div>
@@ -1657,22 +1972,37 @@ function ReportWizard({
             </div>
           </div>
           <div className="mt-5 border border-border p-4">
-            <div className="flex items-center gap-2 text-[12px] font-semibold">
-              <Layers3 className="h-4 w-4 text-primary" />
-              Similar reports nearby
+            <div className="flex items-center justify-between text-[12px] font-semibold">
+              <span className="flex items-center gap-2">
+                <Layers3 className="h-4 w-4 text-primary" />
+                Nearby Similar Reports
+              </span>
+              <span className="text-[10px] font-normal text-muted-foreground">
+                CivicPulse Duplicate Detection
+              </span>
             </div>
-            <p className="mt-2 text-[11px] text-muted-foreground">
-              3 reports found within 500 m · Closest match 91% similar
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {["CIV-2026-00119 · 120 m", "CIV-2026-00107 · 280 m", "CIV-2026-00098 · 420 m"].map(
-                (item) => (
-                  <span key={item} className="border border-border px-2 py-1.5 text-[10px]">
-                    {item}
-                  </span>
-                ),
-              )}
-            </div>
+            {detectedDuplicates.length > 0 ? (
+              <div className="mt-3 space-y-1.5">
+                {detectedDuplicates.map((dup) => (
+                  <div
+                    key={dup.issueId}
+                    className="flex items-center justify-between border border-border px-3 py-2 text-[11px]"
+                  >
+                    <span>
+                      <strong>{dup.issueId}</strong> · {dup.category} ({dup.distance})
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {dup.similarity}% similarity · {prettyStatus(dup.status)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                No duplicate reports detected within {settings?.duplicateRadiusMeters ?? 500}{" "}
+                meters.
+              </p>
+            )}
           </div>
           <div className="mt-6 flex justify-between">
             <Button variant="outline" onClick={() => setStep(2)}>
@@ -1710,7 +2040,7 @@ function ReportWizard({
               </div>
               <div>
                 <span className="block text-muted-foreground">Location</span>
-                <span className="mt-1 block truncate font-semibold">{location}</span>
+                <span className="mt-1 block truncate font-semibold">{locationMeta.address}</span>
               </div>
               <div>
                 <span className="block text-muted-foreground">Status</span>
@@ -2255,13 +2585,17 @@ function IssueDetail({
               </div>
               <MapPin className="h-4 w-4 text-primary" />
             </div>
-            <div className="civic-map civic-grid relative mt-4 h-[175px]">
-              <span className="absolute left-[52%] top-[45%] grid h-9 w-9 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-4 border-card bg-orange-500 text-white shadow">
-                <MapPin className="h-4 w-4" />
-              </span>
-              <div className="absolute bottom-3 left-3 bg-card px-2 py-1 text-[10px] shadow">
-                Ward-wide demo map
-              </div>
+            <div className="mt-4 overflow-hidden border border-border">
+              <CivicGeoMap
+                issues={[issue]}
+                selectedPosition={{
+                  latitude: issue.latitude ?? issue.lat,
+                  longitude: issue.longitude ?? 74.55,
+                  label: `${issue.id}: ${issue.title}`,
+                }}
+                height="190px"
+                interactive={false}
+              />
             </div>
           </section>
         </div>
@@ -2352,32 +2686,12 @@ function CivicMap({
             </label>
           ))}
         </div>
-        <div className="civic-map civic-grid relative mt-4 min-h-[540px] overflow-hidden border border-border">
-          {filtered.map((issue) => (
-            <button
-              key={issue.id}
-              aria-label={`Open ${issue.id}`}
-              title={`${issue.title} · ${prettyStatus(issue.status)}`}
-              onClick={() => onIssue(issue.id)}
-              className={`absolute grid h-8 w-8 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-[3px] border-card shadow-sm transition-transform hover:scale-125 ${issue.priority === "Critical" ? "bg-rose-600" : issue.priority === "High" ? "bg-orange-500" : issue.priority === "Medium" ? "bg-amber-500" : "bg-emerald-600"}`}
-              style={{ left: `${issue.left}%`, top: `${issue.top}%` }}
-            >
-              <MapPin className="h-3.5 w-3.5 text-white" />
-            </button>
-          ))}
-          {[
-            ["Ward 04", 23, 28, "bg-rose-500"],
-            ["Ward 12", 61, 54, "bg-orange-400"],
-            ["Ward 08", 78, 72, "bg-amber-400"],
-          ].map(([label, left, top, tone]) => (
-            <span
-              key={label as string}
-              className={`pointer-events-none absolute h-32 w-32 -translate-x-1/2 -translate-y-1/2 rounded-full ${tone as string} opacity-10 blur-2xl`}
-              style={{ left: `${left}%`, top: `${top}%` }}
-            />
-          ))}
-          <div className="absolute bottom-4 left-4 flex flex-wrap gap-3 border border-border bg-card px-3 py-2 text-[10px] shadow">
-            <span className="font-semibold">{filtered.length} visible reports</span>
+        <div className="mt-4 overflow-hidden border border-border">
+          <CivicGeoMap issues={filtered} onIssue={onIssue} height="540px" />
+        </div>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border border-border bg-card px-3 py-2 text-[10px] shadow-sm">
+          <span className="font-semibold">{filtered.length} visible reports</span>
+          <div className="flex flex-wrap gap-3">
             <span className="flex items-center gap-1">
               <i className="h-2 w-2 rounded-full bg-rose-600" />
               Critical
@@ -2550,7 +2864,15 @@ function Intelligence({ issues }: { issues: CivicIssue[] }) {
   );
 }
 
-function AdminDashboard({ issues }: { issues: CivicIssue[] }) {
+function AdminDashboard({
+  issues,
+  settings: _settings,
+  onSave: _onSave,
+}: {
+  issues: CivicIssue[];
+  settings?: CivicSettings;
+  onSave?: (settings: CivicSettings) => void;
+}) {
   const adminItems = [
     { label: "Users", value: "248", icon: UsersRound },
     { label: "Departments", value: departments.length, icon: Building2 },

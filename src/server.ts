@@ -2,6 +2,7 @@ import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+import { processAiAnalyze, type ServerAIRequest } from "./server/aiRouter";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -47,6 +48,37 @@ function isH3SwallowedErrorBody(body: string): boolean {
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      const url = new URL(request.url);
+
+      // Handle server-side AI analysis endpoint directly
+      if (url.pathname === "/api/ai/analyze") {
+        if (request.method === "POST") {
+          try {
+            const body = (await request.json()) as ServerAIRequest;
+            const result = await processAiAnalyze(body);
+            return new Response(JSON.stringify(result), {
+              status: 200,
+              headers: {
+                "content-type": "application/json; charset=utf-8",
+                "cache-control": "no-store",
+              },
+            });
+          } catch (err) {
+            console.error("[CivicPulse API Error] Failed to parse request body:", err);
+            return new Response(
+              JSON.stringify({
+                error: "Invalid request payload",
+              }),
+              {
+                status: 400,
+                headers: { "content-type": "application/json; charset=utf-8" },
+              },
+            );
+          }
+        }
+        return new Response("Method Not Allowed", { status: 405 });
+      }
+
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);

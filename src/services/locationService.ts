@@ -1,5 +1,7 @@
 import { civicAreas } from "@/lib/civic-data";
 
+export type CivicArea = (typeof civicAreas)[number];
+
 export type LocationMeta = {
   latitude: number;
   longitude: number;
@@ -49,7 +51,16 @@ export function getCurrentLocation(): Promise<Coordinates> {
             : error.code === error.TIMEOUT
               ? "timeout"
               : "unavailable";
-        reject(new LocationServiceError(code, "Location is unavailable."));
+        reject(
+          new LocationServiceError(
+            code,
+            code === "denied"
+              ? "Location permission was denied. Please select a location manually."
+              : code === "timeout"
+                ? "Location request timed out. Please select a location manually."
+                : "Unable to retrieve current location. Please select a location manually.",
+          ),
+        );
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
     );
@@ -61,7 +72,7 @@ function distanceInKm(
   longitude: number,
   targetLatitude: number,
   targetLongitude: number,
-) {
+): number {
   const radians = (value: number) => (value * Math.PI) / 180;
   const earthRadius = 6371;
   const deltaLat = radians(targetLatitude - latitude);
@@ -72,17 +83,24 @@ function distanceInKm(
   return earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-export function getNearestCivicArea(latitude: number, longitude: number) {
-  return civicAreas.reduce(
-    (nearest, area) => {
-      const distance = distanceInKm(latitude, longitude, area.latitude, area.longitude);
-      return distance < nearest.distance ? { area, distance } : nearest;
-    },
-    { area: civicAreas[0], distance: Number.POSITIVE_INFINITY },
-  );
+export function getNearestCivicArea(
+  latitude: number,
+  longitude: number,
+): { area: CivicArea; distance: number } {
+  let nearest: { area: CivicArea; distance: number } = {
+    area: civicAreas[0],
+    distance: Number.POSITIVE_INFINITY,
+  };
+  for (const area of civicAreas) {
+    const distance = distanceInKm(latitude, longitude, area.latitude, area.longitude);
+    if (distance < nearest.distance) {
+      nearest = { area, distance };
+    }
+  }
+  return nearest;
 }
 
-export function getWard(latitude: number, longitude: number) {
+export function getWard(latitude: number, longitude: number): string {
   return getNearestCivicArea(latitude, longitude).area.ward;
 }
 
@@ -91,7 +109,14 @@ export async function reverseGeocode(
   longitude: number,
 ): Promise<Partial<LocationMeta>> {
   const nearest = getNearestCivicArea(latitude, longitude).area;
-  if (typeof fetch === "undefined") return { ...nearest };
+  if (typeof fetch === "undefined") {
+    return {
+      address: nearest.address,
+      city: nearest.city,
+      area: nearest.area,
+      ward: nearest.ward,
+    };
+  }
 
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), 3500);
@@ -111,12 +136,17 @@ export async function reverseGeocode(
     const address = result.address ?? {};
     return {
       address: result.display_name ?? nearest.address,
-      city: address.city ?? address.town ?? address.village ?? nearest.city,
-      area: address.suburb ?? address.neighbourhood ?? nearest.area,
-      ward: address.city_district ?? nearest.ward,
+      city: address["city"] ?? address["town"] ?? address["village"] ?? nearest.city,
+      area: address["suburb"] ?? address["neighbourhood"] ?? nearest.area,
+      ward: address["city_district"] ?? nearest.ward,
     };
   } catch {
-    return { ...nearest };
+    return {
+      address: nearest.address,
+      city: nearest.city,
+      area: nearest.area,
+      ward: nearest.ward,
+    };
   } finally {
     window.clearTimeout(timeout);
   }

@@ -7,8 +7,12 @@ export type AIAnalysis = {
   department: string;
   confidence: number;
   summary: string;
+  detectedProblem: string;
+  reasoning: string;
+  recommendedAction: string;
   duplicateIds: string[];
   usedMock: boolean;
+  mockReason?: string | undefined;
 };
 
 export type DuplicateSuggestion = {
@@ -22,40 +26,63 @@ export type DuplicateSuggestion = {
 };
 
 const isMockMode = (mode?: "mock" | "real") =>
-  mode === "mock" || import.meta.env.VITE_MOCK_AI_MODE !== "false";
+  mode === "mock" || import.meta.env["VITE_MOCK_AI_MODE"] !== "false";
 
-function mockAnalysis(description: string): AIAnalysis {
+function mockAnalysis(description: string, location?: string): AIAnalysis {
   const text = description.toLowerCase();
-  const road = /pothole|road|pavement|street/.test(text);
-  const garbage = /garbage|waste|bin|overflow/.test(text);
-  const water = /water|leak|pipe/.test(text);
+  const road = /pothole|road|pavement|street|crater/.test(text);
+  const garbage = /garbage|waste|bin|overflow|litter|dump/.test(text);
+  const water = /water|leak|pipe|burst|tap/.test(text);
+  const drain = /drain|gutter|clog|sewage|storm/.test(text);
+  const light = /streetlight|light|dark|pole|wire/.test(text);
+  const tree = /tree|branch|fallen/.test(text);
+
   const category = road
     ? "Road Damage / Pothole"
     : garbage
       ? "Garbage"
       : water
         ? "Water Leakage"
-        : "Infrastructure";
+        : drain
+          ? "Drainage"
+          : light
+            ? "Streetlight"
+            : tree
+              ? "Trees"
+              : "Infrastructure";
   const department = road
     ? "Road Maintenance"
     : garbage
       ? "Waste Management"
       : water
         ? "Water Supply"
-        : "Infrastructure";
-  const severity: CivicIssue["priority"] = /danger|crash|blocked|large|major/.test(text)
-    ? "High"
-    : "Medium";
+        : drain
+          ? "Drainage"
+          : light
+            ? "Electrical"
+            : tree
+              ? "Parks & Gardens"
+              : "Infrastructure";
+  const severity: CivicIssue["priority"] = /life|collapse|electroc|sinkhole/.test(text)
+    ? "Critical"
+    : /danger|crash|blocked|accident|burst|flooding|severe|deep/.test(text)
+      ? "High"
+      : "Medium";
   return {
     category,
     severity,
     impact:
-      severity === "High"
-        ? "May create a public safety risk and disrupt daily movement."
-        : "Localized disruption reported by residents.",
+      severity === "Critical"
+        ? "Severe public hazard requiring emergency response team."
+        : severity === "High"
+          ? "May create a public safety risk and disrupt daily movement."
+          : "Localized disruption reported by residents.",
     department,
-    confidence: road || garbage || water ? 94 : 82,
-    summary: `The report appears to describe a ${category.toLowerCase()} concern that needs municipal review.`,
+    confidence: road || garbage || water || drain || light ? 94 : 82,
+    summary: `The report appears to describe a ${category.toLowerCase()} concern${location ? ` near ${location}` : ""} that needs municipal review.`,
+    detectedProblem: description.trim() || `${category} issue`,
+    reasoning: "Assisted classification generated from report description and civic patterns.",
+    recommendedAction: `Forward ticket to ${department} for inspection and dispatch.`,
     duplicateIds: [],
     usedMock: true,
   };
@@ -65,13 +92,18 @@ export async function analyzeImage(
   imageData: string | undefined,
   description: string,
   mode?: "mock" | "real",
+  locationContext?: string,
 ): Promise<AIAnalysis> {
-  if (isMockMode(mode)) return mockAnalysis(description);
+  if (isMockMode(mode)) return mockAnalysis(description, locationContext);
   try {
     const response = await fetch("/api/ai/analyze", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ imageData, description }),
+      body: JSON.stringify({
+        imageData,
+        description,
+        location: locationContext,
+      }),
     });
     if (!response.ok) throw new Error("AI provider unavailable");
     const result = (await response.json()) as Partial<AIAnalysis>;
@@ -84,16 +116,24 @@ export async function analyzeImage(
       department: result.department,
       confidence: Math.min(100, Math.max(0, Number(result.confidence ?? 75))),
       summary: result.summary,
+      detectedProblem: result.detectedProblem ?? description,
+      reasoning: result.reasoning ?? "Classified by municipal AI triage.",
+      recommendedAction: result.recommendedAction ?? `Dispatch to ${result.department}`,
       duplicateIds: result.duplicateIds ?? [],
-      usedMock: false,
+      usedMock: Boolean(result.usedMock),
+      mockReason: result.mockReason,
     };
   } catch {
-    return mockAnalysis(description);
+    return mockAnalysis(description, locationContext);
   }
 }
 
-export async function analyzeText(description: string, mode?: "mock" | "real") {
-  return analyzeImage(undefined, description, mode);
+export async function analyzeText(
+  description: string,
+  mode?: "mock" | "real",
+  locationContext?: string,
+) {
+  return analyzeImage(undefined, description, mode, locationContext);
 }
 
 export function estimateSeverity(description: string): CivicIssue["priority"] {
